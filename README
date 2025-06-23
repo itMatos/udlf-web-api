@@ -1,0 +1,25 @@
+meu-projeto/
+├── src/
+│   ├── controllers/       # Lógica de controle das rotas
+│   │   └── execution.controller.ts
+│   ├── services/          # Lógica de negócios
+│   │   └── execution.service.ts
+│   ├── middlewares/       # Middlewares personalizados
+│   │   └── fileUpload.middleware.ts
+│   ├── models/            # Definições de tipos e interfaces
+│   │   └── executionResult.model.ts
+│   ├── routes/            # Definição das rotas
+│   │   └── execution.routes.ts
+│   ├── utils/             # Funções utilitárias
+│   │   └── file.utils.ts
+│   ├── config/            # Configurações do aplicativo
+│   │   └── config.ts
+│   ├── server.ts          # Ponto de entrada do servidor
+│   └── app.ts             # Configuração do Express
+├── temp/                  # Pasta para arquivos temporários
+├── test/                  # Testes unitários e de integração
+├── .env                   # Variáveis de ambiente
+├── package.json
+├── tsconfig.json
+├── README.md
+

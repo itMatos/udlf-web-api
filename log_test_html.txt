@@ -1,0 +1,38 @@
+ # UNSUPERVISED DISTANCE LEARNING METHODS FRAMEWORK #
+
+
+ - GENERAL INFORMATION -
+ --------------------------------------
+ Task:             UDL
+ Method:           BFSTREE
+ Dataset Size:     1400
+ Image List File:  /Users/italomatos/Documents/IC/UDLF/Datasets/mpeg7/lists_mpeg7.txt
+ Image Class File: /Users/italomatos/Documents/IC/UDLF/Datasets/mpeg7/classes_mpeg7.txt
+ Input File:       /Users/italomatos/Documents/IC/UDLF/Datasets/mpeg7/ranked_lists/AIR.txt
+ Input Format:     RK NUM  (automatically detected)
+ --------------------------------------
+
+
+ - METHOD PARAMETERS -
+ --------------------------------------
+ PARAM_BFSTREE_CORRELATION_METRIC = RBO
+ PARAM_BFSTREE_K = 20
+ PARAM_BFSTREE_L = 1400
+ --------------------------------------
+
+
+ - EVALUATION RESULTS -
+ --------------------------------------
+ * Effectiveness:
+ Before: 
+	 P@20		0.8817
+	 Recall@10	0.4657
+ After: 
+	 P@20		0.9356
+	 Recall@10	0.4851
+ Relative Gains: 
+	 P@20		6.1163%
+	 Recall@10	4.1639%
+ --------------------------------------
+
+ Log generated at 2025/6/18 18:31:29
