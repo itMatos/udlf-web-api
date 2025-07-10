@@ -4,19 +4,20 @@ import path from "path";
 
 export class ExecutionController {
   private executionService: ExecutionService;
+  private UPLOADS_DIR: string;
 
   constructor(executionService: ExecutionService) {
     this.executionService = executionService;
+    this.UPLOADS_DIR = "/Users/italomatos/Documents/IC/udlf-api/uploads";
   }
 
-  async execute(req: Request, res: Response): Promise<void> {
-    if (!req.file) {
-      res.status(400).json({ error: "No file uploaded" });
+  async execute(filename: string, res: Response): Promise<void> {
+    if (!filename) {
+      res.status(400).json({ error: "File name is required" });
       return;
     }
-    console.log(`File uploaded: ${req.file.originalname}`);
 
-    const configFilePath = path.join(process.cwd(), "uploads", req.file.filename);
+    const configFilePath = path.join(this.UPLOADS_DIR, filename);
 
     try {
       const result = await this.executionService.execute(configFilePath);

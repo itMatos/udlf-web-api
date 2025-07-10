@@ -29,8 +29,27 @@ router.get("/", (_req, res) => {
   });
 });
 
-router.post("/execute", upload.single("config_file"), (req, res) => {
-  executionController.execute(req, res);
+router.post("/upload-file", upload.single("config_file"), (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+
+  console.log(`File uploaded: ${req.file.originalname}`);
+  res.json({
+    message: "File uploaded successfully",
+    filename: req.file.filename,
+    originalname: req.file.originalname,
+  });
+});
+
+router.get("/execute/:filename", (req, res) => {
+  const filename = req.params.filename;
+  if (!filename) {
+    res.status(400).json({ error: "File name is required" });
+    return;
+  }
+  executionController.execute(filename, res);
 });
 
 router.get("/output-file/:filename", (req, res) => {
@@ -107,6 +126,7 @@ router.get("/image-file/:imageName", (req: Request, res: Response) => {
 router.get("/outputs/:filename/line/:line", async (req: Request, res: Response) => {
   const { filename, line } = req.params;
   const outputdir = "/Users/italomatos/Documents/IC/udlf-api/outputs";
+  console.log(`Request to read line ${line} from file ${filename} in directory ${outputdir}`);
   const filePath = path.join(outputdir, filename);
   const lineNumber = parseInt(line, 10);
 
