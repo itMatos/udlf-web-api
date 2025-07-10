@@ -29,6 +29,33 @@ router.get("/", (_req, res) => {
   });
 });
 
+router.get("/download-output/:filename", (req, res) => {
+  const { filename } = req.params;
+  const outputdir = "/Users/italomatos/Documents/IC/udlf-api/outputs";
+
+  const filePath = path.join(outputdir, filename);
+
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error(`File not found: ${filePath}`);
+      return res.status(404).json({ error: "Output file not found" });
+    }
+    if (!res.headersSent) {
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Type", "application/octet-stream");
+    }
+
+    res.download(filePath, (downloadErr) => {
+      if (downloadErr) {
+        console.error(`Error downloading file: ${downloadErr}`);
+        res.status(500).json({ error: "Error downloading output file" });
+      } else {
+        console.log(`File downloaded successfully: ${filename}`);
+      }
+    });
+  });
+});
+
 router.post("/upload-file", upload.single("config_file"), (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "No file uploaded" });
