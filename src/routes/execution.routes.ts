@@ -5,6 +5,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import readline from "readline";
+import { readSpecificLine } from "../utils/helpers";
 
 const router = Router();
 const executionService = new ExecutionService();
@@ -189,30 +190,20 @@ router.get("/outputs/:filename/line/:line", async (req: Request, res: Response) 
   }
 });
 
-async function readSpecificLine(filePath: string, lineNumber: number) {
-  const fileStream = fs.createReadStream(filePath);
+router.get("/paginated-file-list/:filename/page/:pageIndex", async (req: Request, res: Response) => {
+  const { filename, pageIndex } = req.params;
+  const { pageSize } = req.query;
 
-  const rl = readline.createInterface({
-    input: fileStream,
-    crlfDelay: Infinity,
-  });
+  const pageIndexNumber = parseInt(pageIndex as string, 10);
+  const pageSizeNumber = parseInt(pageSize as string, 10) || 10;
 
-  let currentLine = 0;
-  for await (const line of rl) {
-    currentLine++;
-    if (currentLine === lineNumber) {
-      rl.close();
-      fileStream.destroy();
-      return line;
-    }
-    // Se a linha for muito grande ou se quiser parar de ler após um certo ponto
-    // if (currentLine > lineNumber) {
-    //   rl.close();
-    //   fileStream.destroy();
-    //   return null;
-    // }
+  try {
+    const files = await executionService.getListFilesByPage(pageIndexNumber, pageSizeNumber);
+    res.status(200).json(files);
+  } catch (error) {
+    console.error(`Error fetching files for ${filename}, page ${pageIndexNumber}:`, error);
+    res.status(500).json({ error: "Internal server error while trying to fetch files." });
   }
-  return null;
-}
+});
 
 export default router;
