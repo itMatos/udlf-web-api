@@ -11,3 +11,4 @@ services:
       - /app/node_modules
       - ${HOST_DATASETS_PATH}:${APP_DATASETS_PATH}
     restart: on-failure
+
