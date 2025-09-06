@@ -1,7 +1,7 @@
 import path from "path";
 const ROOT_UDLF_PATH = process.env.HOST_UDLF_PATH || "";
 const APP_DATASETS_PATH = process.env.APP_DATASETS_PATH || "/app/datasets";
-const lists_mpeg7_path = path.join(APP_DATASETS_PATH, "mpeg7/lists_mpeg7.txt");
+const lists_mpeg7_path = path.join("/Users/italomatos/Documents/IC/UDLF/Datasets", "/mpeg7/lists_mpeg7.txt");
 
 export const paths = {
   uploads: path.join(process.cwd(), "uploads"),

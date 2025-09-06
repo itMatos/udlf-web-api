@@ -6,9 +6,9 @@ services:
     container_name: udlf_web_api
     ports:
       - "8080:8080"
+
     volumes:
       - .:/app
       - /app/node_modules
-      - ${HOST_DATASETS_PATH}:${APP_DATASETS_PATH}
+      - ${HOST_UDLF_PATH}:${APP_DATASETS_PATH}
     restart: on-failure
-
