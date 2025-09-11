@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import { readSpecificLine } from "../utils/helpers";
 import { paths } from "../config/paths";
 import fs from "fs";
-import { PaginatedResponse } from "../types/interfaces";
+import { lineContent, PaginatedResponse } from "../types/interfaces";
 
 export class ExecutionService {
   public async execute(configFilePath: string): Promise<{ stdout: string; stderr: string }> {
@@ -42,9 +42,9 @@ export class ExecutionService {
     const start = (pageIndex - 1) * pageSize;
     const end = start + pageSize;
 
-    const items = allFiles.slice(start, end).map((content, index) => ({
+    const items = allFiles.slice(start, end).map((fileInputNameLine, index) => ({
       lineNumber: start + index + 1,
-      content,
+      fileInputNameLine,
     }));
 
     return {
@@ -54,5 +54,25 @@ export class ExecutionService {
       pageSize,
       items,
     };
+  }
+
+  public async getInputNameByIndexList(indexList: number[]): Promise<lineContent[]> {
+    console.log("Received index list:", indexList);
+    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
+    const fileContent = await fs.promises.readFile(paths.datasetList, "utf-8");
+    const allFiles = fileContent.split("\n").filter(Boolean);
+
+    const result: lineContent[] = [];
+
+    for (const index of indexList) {
+      const lineNumberToAccess = index + 1;
+      if (lineNumberToAccess < 1 || lineNumberToAccess > allFiles.length) {
+        throw new Error(`Index ${index} is out of bounds.`);
+      }
+      const fileInputNameLine = allFiles[lineNumberToAccess - 1];
+      result.push({ lineNumber: lineNumberToAccess, fileInputNameLine });
+    }
+
+    return result;
   }
 }

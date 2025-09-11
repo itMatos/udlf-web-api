@@ -1,6 +1,6 @@
 export interface lineContent {
   lineNumber: number;
-  content: string;
+  fileInputNameLine: string;
 }
 
 export interface PaginatedResponse {
