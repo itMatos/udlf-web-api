@@ -226,4 +226,14 @@ router.get("/paginated-file-list/:filename/page/:pageIndex", async (req: Request
   }
 });
 
+router.get("/get-all-input-file-names", async (_req, res) => {
+  try {
+    const files = await executionService.getAllInputNames();
+    res.status(200).json(files);
+  } catch (error) {
+    console.error("Error fetching all input file names:", error);
+    res.status(500).json({ error: "Internal server error while trying to fetch all input file names." });
+  }
+});
+
 export default router;

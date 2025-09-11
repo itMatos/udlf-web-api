@@ -56,6 +56,12 @@ export class ExecutionService {
     };
   }
 
+  public async getAllInputNames(): Promise<string[]> {
+    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
+    const fileContent = await fs.promises.readFile(paths.datasetList, "utf-8");
+    return fileContent.split("\n").filter(Boolean);
+  }
+
   public async getInputNameByIndexList(indexList: number[]): Promise<lineContent[]> {
     console.log("Received index list:", indexList);
     await fs.promises.access(paths.datasetList, fs.constants.F_OK);
