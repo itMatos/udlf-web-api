@@ -3,6 +3,8 @@ import { readSpecificLine } from "../utils/helpers";
 import { paths } from "../config/paths";
 import fs from "fs";
 import { lineContent, PaginatedResponse } from "../types/interfaces";
+import { FileUtils } from "../utils/file.utils";
+import { FilenamesByClass, InputFileDetail } from "../types/file";
 
 export class ExecutionService {
   public async execute(configFilePath: string): Promise<{ stdout: string; stderr: string }> {
@@ -62,8 +64,31 @@ export class ExecutionService {
     return fileContent.split("\n").filter(Boolean);
   }
 
+  public async allFilenamesByClasses(): Promise<FilenamesByClass> {
+    await fs.promises.access(paths.classList, fs.constants.F_OK);
+    const contentClassList = await fs.promises.readFile(paths.classList, "utf-8");
+    const allNames = contentClassList.split("\n").filter(Boolean);
+
+    const groupedByClasses = FileUtils.groupInputFilenamesByClass(allNames);
+    return groupedByClasses;
+  }
+
+  public async inputFileDetailsByName(): Promise<InputFileDetail> {
+    await fs.promises.access(paths.classList, fs.constants.F_OK);
+    const contentListFile = await fs.promises.readFile(paths.datasetList, "utf-8");
+    const contentClassList = await fs.promises.readFile(paths.classList, "utf-8");
+    const allInputNames = contentListFile.split("\n").filter(Boolean);
+    const allNames = contentClassList.split("\n").filter(Boolean);
+
+    const fileIndexMap = FileUtils.mapInputFilenamesToLineNumber(allInputNames);
+    const groupedByClasses = FileUtils.groupInputFilenamesByClass(allNames);
+
+    const inputFileDetails: InputFileDetail = FileUtils.buildFileDetails(groupedByClasses, fileIndexMap);
+    
+    return inputFileDetails;
+  }
+
   public async getInputNameByIndexList(indexList: number[]): Promise<lineContent[]> {
-    console.log("Received index list:", indexList);
     await fs.promises.access(paths.datasetList, fs.constants.F_OK);
     const fileContent = await fs.promises.readFile(paths.datasetList, "utf-8");
     const allFiles = fileContent.split("\n").filter(Boolean);
@@ -80,5 +105,35 @@ export class ExecutionService {
     }
 
     return result;
+  }
+
+  public async getInputFileDetailsByLineNumbers(lineNumbers: number[]): Promise<InputFileDetail> {
+    await fs.promises.access(paths.classList, fs.constants.F_OK);
+    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
+    const contentListFile = await fs.promises.readFile(paths.datasetList, "utf-8");
+    const contentClassList = await fs.promises.readFile(paths.classList, "utf-8");
+
+    // [apple-1.gif, apple-2.gif, ...]
+    const allInputNames = contentListFile.split("\n").filter(Boolean);
+    const allNamesByClasses = contentClassList.split("\n").filter(Boolean);
+
+    const fileIndexMap = FileUtils.mapInputFilenamesToLineNumber(allInputNames);
+    const lineFileMap = FileUtils.mapInputLineNumbersFilenames(allInputNames);
+
+    const groupedByClasses = FileUtils.groupInputFilenamesByClass(allNamesByClasses);
+
+    const fullInputFileDetails: InputFileDetail = FileUtils.buildFileDetails(groupedByClasses, fileIndexMap);
+
+    const filtered: InputFileDetail = {};
+    for (const lineNumber of lineNumbers) {
+      const filename = lineFileMap.get(lineNumber);
+      if (filename && fullInputFileDetails[filename]) {
+        filtered[filename] = fullInputFileDetails[filename];
+      } else {
+        console.warn(`No details found for line number ${lineNumber}`);
+      }
+    }
+
+    return filtered;
   }
 }

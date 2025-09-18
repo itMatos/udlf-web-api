@@ -12,7 +12,7 @@ export async function readSpecificLine(filePath: string, lineNumber: number) {
   let currentLine = 0;
   for await (const line of rl) {
     currentLine++;
-    if (currentLine === lineNumber) {
+    if (currentLine === lineNumber + 1) {
       rl.close();
       fileStream.destroy();
       return line;

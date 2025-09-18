@@ -110,6 +110,19 @@ router.get("/file-input-name-by-index", async (req, res) => {
   }
 });
 
+router.get("/file-input-details-by-line-numbers", async (req, res) => {
+  const { lineNumbers } = req.query;
+  const indexes = String(lineNumbers).split(",").map(Number);
+
+  try {
+    const result = await executionService.getInputFileDetailsByLineNumbers(indexes);
+    res.status(200).json(result);
+  } catch (error: any) {
+    console.error(`Error processing request for file line numbers ${indexes}:`, error);
+    res.status(500).json({ error: "Internal server error while trying to read the file." });
+  }
+});
+
 router.get("/teste/get-line-by-image-name/:imageName", async (req, res) => {
   const { imageName } = req.params;
   const listFilePath = "/Users/italomatos/Documents/IC/UDLF/Datasets/mpeg7/lists_mpeg7.txt";
@@ -233,6 +246,30 @@ router.get("/get-all-input-file-names", async (_req, res) => {
   } catch (error) {
     console.error("Error fetching all input file names:", error);
     res.status(500).json({ error: "Internal server error while trying to fetch all input file names." });
+  }
+});
+
+// TODO: o parâmetro deve ser o nome do arquivo config
+// /get-grouped-class-names/:configFileName
+router.get("/grouped-input-class-names", async (req, res) => {
+  // const { configFileName } = req.params;
+  try {
+    const classNames = await executionService.allFilenamesByClasses();
+    res.status(200).json(classNames);
+  } catch (error) {
+    console.error("Error fetching all class names:", error);
+    res.status(500).json({ error: "Internal server error while trying to fetch all class names." });
+  }
+});
+
+router.get("/input-file-details-by-name", async (req, res) => {
+  // const { inputFileNames } = req.query;
+  try {
+    const inputFileDetails = await executionService.inputFileDetailsByName();
+    res.status(200).json(inputFileDetails);
+  } catch (error) {
+    console.error("Error fetching input file details:", error);
+    res.status(500).json({ error: "Internal server error while trying to fetch input file details." });
   }
 });
 
