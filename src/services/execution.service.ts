@@ -6,10 +6,13 @@ import { lineContent, PaginatedResponse } from "../types/interfaces";
 import { FileUtils } from "../utils/file.utils";
 import { FilenamesByClass, InputFileDetail } from "../types/file";
 
+const executablePathDocker = "/app/udlf/bin/udlf" as const;
+const outputDirDocker = "/app/outputs" as const;
+
 export class ExecutionService {
   public async execute(configFilePath: string): Promise<{ stdout: string; stderr: string }> {
-    const executablePath = "/Users/italomatos/Documents/IC/udlf-api/src/udlf/bin/udlf";
-    const outputDir = "/Users/italomatos/Documents/IC/udlf-api/outputs";
+    const executablePath = executablePathDocker;
+    const outputDir = outputDirDocker;
 
     return new Promise((resolve, reject) => {
       exec(`${executablePath} ${configFilePath}`, { cwd: outputDir }, (error, stdout, stderr) => {

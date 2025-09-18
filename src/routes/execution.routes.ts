@@ -125,7 +125,7 @@ router.get("/file-input-details-by-line-numbers", async (req, res) => {
 
 router.get("/teste/get-line-by-image-name/:imageName", async (req, res) => {
   const { imageName } = req.params;
-  const listFilePath = "/Users/italomatos/Documents/IC/UDLF/Datasets/mpeg7/lists_mpeg7.txt";
+  const listFilePath = "/app/Datasets/mpeg7/lists_mpeg7.txt";
 
   try {
     await fs.promises.access(listFilePath, fs.constants.F_OK);
@@ -165,7 +165,7 @@ router.get("/teste/get-line-by-image-name/:imageName", async (req, res) => {
 router.get("/image-file/:imageName", (req: Request, res: Response) => {
   const { imageName } = req.params;
   console.log("Requested image:", imageName);
-  const imagePath = path.join("/Users/italomatos/Documents/IC/UDLF/Datasets/mpeg7/original/", imageName);
+  const imagePath = path.join("/app/Datasets/mpeg7/original/", imageName);
 
   // Verifica se o arquivo existe
   fs.access(imagePath, fs.constants.F_OK, (err) => {
@@ -186,7 +186,7 @@ router.get("/image-file/:imageName", (req: Request, res: Response) => {
 
 router.get("/outputs/:filename/line/:line", async (req: Request, res: Response) => {
   const { filename, line } = req.params;
-  const outputdir = "/Users/italomatos/Documents/IC/udlf-api/outputs";
+  const outputdir = "/app/outputs";
   console.log(`Request to read line ${line} from file ${filename} in directory ${outputdir}`);
   const filePath = path.join(outputdir, filename);
   const lineNumber = parseInt(line, 10);

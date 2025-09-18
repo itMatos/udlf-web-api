@@ -2,13 +2,15 @@ import { Request, Response } from "express";
 import { ExecutionService } from "../services/execution.service";
 import path from "path";
 
+const uploadsDirDocker = "/app/uploads" as const;
+
 export class ExecutionController {
   private executionService: ExecutionService;
   private UPLOADS_DIR: string;
 
   constructor(executionService: ExecutionService) {
     this.executionService = executionService;
-    this.UPLOADS_DIR = "/Users/italomatos/Documents/IC/udlf-api/uploads";
+    this.UPLOADS_DIR = uploadsDirDocker;
   }
 
   async execute(filename: string, res: Response): Promise<void> {
@@ -20,6 +22,7 @@ export class ExecutionController {
     const configFilePath = path.join(this.UPLOADS_DIR, filename);
 
     try {
+      console.log("Executing command in path...", configFilePath);
       const result = await this.executionService.execute(configFilePath);
 
       res.json({
