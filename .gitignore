@@ -21,6 +21,8 @@
 /build
 /datasets
 /Datasets
+/uploads
+/outputs
 
 # misc
 .DS_Store
