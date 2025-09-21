@@ -10,5 +10,5 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-      - ${HOST_UDLF_PATH}/udlf-api/Datasets:/app/Datasets
+      - ${HOST_UDLF_PATH}:/app/Datasets
     restart: on-failure
