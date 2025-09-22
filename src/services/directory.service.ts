@@ -14,9 +14,10 @@ export class DirectoryService {
       // Configuração para Docker
       this.rootPath = "/app";
       this.allowedPaths = [
+        "/app",
         "/app/Datasets",
-        // "/app/outputs",
-        // "/app/uploads",
+        "/app/outputs",
+        "/app/uploads",
       ];
     } else {
       // Configuração para ambiente local

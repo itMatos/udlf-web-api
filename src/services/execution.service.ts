@@ -1,48 +1,101 @@
-import { exec } from "child_process";
+import { spawn } from "child_process";
 import { readSpecificLine } from "../utils/helpers";
 import { paths } from "../config/paths";
 import fs from "fs";
 import { lineContent, PaginatedResponse } from "../types/interfaces";
 import { FileUtils } from "../utils/file.utils";
 import { FilenamesByClass, InputFileDetail } from "../types/file";
+import { ConfigParser, ConfigPaths } from "../utils/config-parser";
 
 const executablePathDocker = "/app/udlf/bin/udlf" as const;
 const outputDirDocker = "/app/outputs" as const;
 
 export class ExecutionService {
+  private configPaths: ConfigPaths | null = null;
+
+  /**
+   * Load dynamic paths from config file
+   */
+  public async loadConfigPaths(configFilePath: string): Promise<ConfigPaths> {
+    if (!this.configPaths) {
+      this.configPaths = await ConfigParser.getDynamicPaths(configFilePath);
+    }
+    return this.configPaths;
+  }
+
   public async execute(configFilePath: string): Promise<{ stdout: string; stderr: string }> {
     const executablePath = executablePathDocker;
     const outputDir = outputDirDocker;
 
     return new Promise((resolve, reject) => {
-      exec(`${executablePath} ${configFilePath}`, { cwd: outputDir }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Error executing command: ${error.message}`);
-          reject({ error: "Failed to execute command", details: error.message });
-          return;
+      const child = spawn(executablePath, [configFilePath], {
+        cwd: outputDir,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      // Captura stdout
+      child.stdout?.on('data', (data) => {
+        const output = data.toString();
+        stdout += output;
+        console.log(`Command output: ${output}`);
+      });
+
+      // Captura stderr
+      child.stderr?.on('data', (data) => {
+        const error = data.toString();
+        stderr += error;
+        console.error(`Command error output: ${error}`);
+      });
+
+      // Evento de finalização
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ stdout, stderr });
+        } else {
+          reject({ 
+            error: "Command failed", 
+            details: `Process exited with code ${code}`,
+            stdout,
+            stderr
+          });
         }
+      });
 
-        console.log(`Command output: ${stdout}`);
-        console.error(`Command error output: ${stderr}`);
-
-        resolve({ stdout, stderr });
+      // Evento de erro
+      child.on('error', (error) => {
+        console.error(`Error executing command: ${error.message}`);
+        reject({ 
+          error: "Failed to execute command", 
+          details: error.message,
+          stdout,
+          stderr
+        });
       });
     });
   }
 
-  public async getFileNameByIndex(index: number): Promise<string> {
-    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
+  public async getFileNameByIndex(index: number, configFilePath?: string): Promise<string> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    
+    await fs.promises.access(datasetListPath, fs.constants.F_OK);
     const lineNumberToAccess = index + 1;
-    const lineContent = await readSpecificLine(paths.datasetList, lineNumberToAccess);
+    const lineContent = await readSpecificLine(datasetListPath, lineNumberToAccess);
     if (lineContent === null) {
       throw new Error(`Index ${index} not found in the list file.`);
     }
     return lineContent;
   }
 
-  public async getListFilesByPage(pageIndex: number, pageSize: number): Promise<PaginatedResponse> {
-    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(paths.datasetList, "utf-8");
+  public async getListFilesByPage(pageIndex: number, pageSize: number, configFilePath?: string): Promise<PaginatedResponse> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    
+    await fs.promises.access(datasetListPath, fs.constants.F_OK);
+    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
     const allFiles = fileContent.split("\n").filter(Boolean);
     const start = (pageIndex - 1) * pageSize;
     const end = start + pageSize;
@@ -61,25 +114,35 @@ export class ExecutionService {
     };
   }
 
-  public async getAllInputNames(): Promise<string[]> {
-    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(paths.datasetList, "utf-8");
+  public async getAllInputNames(configFilePath?: string): Promise<string[]> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    
+    await fs.promises.access(datasetListPath, fs.constants.F_OK);
+    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
     return fileContent.split("\n").filter(Boolean);
   }
 
-  public async allFilenamesByClasses(): Promise<FilenamesByClass> {
-    await fs.promises.access(paths.classList, fs.constants.F_OK);
-    const contentClassList = await fs.promises.readFile(paths.classList, "utf-8");
+  public async allFilenamesByClasses(configFilePath?: string): Promise<FilenamesByClass> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const classListPath = dynamicPaths?.classList || paths.classList;
+    
+    await fs.promises.access(classListPath, fs.constants.F_OK);
+    const contentClassList = await fs.promises.readFile(classListPath, "utf-8");
     const allNames = contentClassList.split("\n").filter(Boolean);
 
     const groupedByClasses = FileUtils.groupInputFilenamesByClass(allNames);
     return groupedByClasses;
   }
 
-  public async inputFileDetailsByName(): Promise<InputFileDetail> {
-    await fs.promises.access(paths.classList, fs.constants.F_OK);
-    const contentListFile = await fs.promises.readFile(paths.datasetList, "utf-8");
-    const contentClassList = await fs.promises.readFile(paths.classList, "utf-8");
+  public async inputFileDetailsByName(configFilePath?: string): Promise<InputFileDetail> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    const classListPath = dynamicPaths?.classList || paths.classList;
+    
+    await fs.promises.access(classListPath, fs.constants.F_OK);
+    const contentListFile = await fs.promises.readFile(datasetListPath, "utf-8");
+    const contentClassList = await fs.promises.readFile(classListPath, "utf-8");
     const allInputNames = contentListFile.split("\n").filter(Boolean);
     const allNames = contentClassList.split("\n").filter(Boolean);
 
@@ -91,9 +154,12 @@ export class ExecutionService {
     return inputFileDetails;
   }
 
-  public async getInputNameByIndexList(indexList: number[]): Promise<lineContent[]> {
-    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(paths.datasetList, "utf-8");
+  public async getInputNameByIndexList(indexList: number[], configFilePath?: string): Promise<lineContent[]> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    
+    await fs.promises.access(datasetListPath, fs.constants.F_OK);
+    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
     const allFiles = fileContent.split("\n").filter(Boolean);
 
     const result: lineContent[] = [];
@@ -110,11 +176,15 @@ export class ExecutionService {
     return result;
   }
 
-  public async getInputFileDetailsByLineNumbers(lineNumbers: number[]): Promise<InputFileDetail> {
-    await fs.promises.access(paths.classList, fs.constants.F_OK);
-    await fs.promises.access(paths.datasetList, fs.constants.F_OK);
-    const contentListFile = await fs.promises.readFile(paths.datasetList, "utf-8");
-    const contentClassList = await fs.promises.readFile(paths.classList, "utf-8");
+  public async getInputFileDetailsByLineNumbers(lineNumbers: number[], configFilePath?: string): Promise<InputFileDetail> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    const classListPath = dynamicPaths?.classList || paths.classList;
+    
+    await fs.promises.access(classListPath, fs.constants.F_OK);
+    await fs.promises.access(datasetListPath, fs.constants.F_OK);
+    const contentListFile = await fs.promises.readFile(datasetListPath, "utf-8");
+    const contentClassList = await fs.promises.readFile(classListPath, "utf-8");
 
     // [apple-1.gif, apple-2.gif, ...]
     const allInputNames = contentListFile.split("\n").filter(Boolean);
