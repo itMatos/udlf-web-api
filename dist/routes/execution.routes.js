@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const execution_service_1 = require("../services/execution.service");
 const execution_controller_1 = require("../controllers/execution.controller");
+const dynamic_paths_service_1 = require("../services/dynamic-paths.service");
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -23,6 +24,7 @@ const storage = multer_1.default.diskStorage({
     },
 });
 const upload = (0, multer_1.default)({ storage });
+const uploadsDirDocker = "/app/uploads";
 router.get("/", (_req, res) => {
     res.json({
         message: "UDLF Server is running",
@@ -37,7 +39,8 @@ router.get("/download-output/:filename", (req, res) => {
     fs_1.default.access(filePath, fs_1.default.constants.F_OK, (err) => {
         if (err) {
             console.error(`File not found: ${filePath}`);
-            return res.status(404).json({ error: "Output file not found" });
+            res.status(404).json({ error: "Output file not found" });
+            return;
         }
         if (!res.headersSent) {
             res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -88,10 +91,11 @@ router.get("/output-file/:filename", (req, res) => {
     });
 });
 router.get("/file-input-name-by-index", async (req, res) => {
-    const { indexList } = req.query;
+    const { indexList, configFile } = req.query;
     const indexes = String(indexList).split(",").map(Number);
     try {
-        const result = await executionService.getInputNameByIndexList(indexes);
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const result = await executionService.getInputNameByIndexList(indexes, configFilePath);
         res.status(200).json(result);
     }
     catch (error) {
@@ -100,10 +104,11 @@ router.get("/file-input-name-by-index", async (req, res) => {
     }
 });
 router.get("/file-input-details-by-line-numbers", async (req, res) => {
-    const { lineNumbers } = req.query;
+    const { lineNumbers, configFile } = req.query;
     const indexes = String(lineNumbers).split(",").map(Number);
     try {
-        const result = await executionService.getInputFileDetailsByLineNumbers(indexes);
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const result = await executionService.getInputFileDetailsByLineNumbers(indexes, configFilePath);
         res.status(200).json(result);
     }
     catch (error) {
@@ -149,20 +154,31 @@ router.get("/teste/get-line-by-image-name/:imageName", async (req, res) => {
 router.get("/image-file/:imageName", (req, res) => {
     const { imageName } = req.params;
     console.log("Requested image:", imageName);
-    const imagePath = path_1.default.join("/app/Datasets/mpeg7/original/", imageName);
-    // Verifica se o arquivo existe
-    fs_1.default.access(imagePath, fs_1.default.constants.F_OK, (err) => {
-        if (err) {
-            console.error(`File not found: ${imagePath}`);
-            return res.status(404).json({ error: "Image file not found" });
-        }
-        // Envia o arquivo de imagem
-        res.sendFile(imagePath, (err) => {
-            if (err) {
-                console.error(`Error sending image file: ${err}`);
-                res.status(500).json({ error: "Error sending image file" });
-            }
+    const { configFile } = req.query;
+    const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+    console.log("Config file path:", configFilePath);
+    if (!configFilePath) {
+        res.status(400).json({ error: "Config file is required for this endpoint" });
+        return;
+    }
+    dynamic_paths_service_1.DynamicPathsService.getPathsForConfig(configFilePath)
+        .then((dynamicPaths) => {
+        const imagePath = path_1.default.join(dynamicPaths.datasetImages, imageName);
+        // Verifica se o arquivo existe
+        return fs_1.default.promises.access(imagePath, fs_1.default.constants.F_OK)
+            .then(() => {
+            // Envia o arquivo de imagem
+            res.sendFile(imagePath, (err) => {
+                if (err) {
+                    console.error(`Error sending image file: ${err}`);
+                    res.status(500).json({ error: "Error sending image file" });
+                }
+            });
         });
+    })
+        .catch((err) => {
+        console.error(`File not found: ${err}`);
+        res.status(404).json({ error: "Image file not found" });
     });
 });
 router.get("/outputs/:filename/line/:line", async (req, res) => {
@@ -203,11 +219,13 @@ router.get("/outputs/:filename/line/:line", async (req, res) => {
 });
 router.get("/paginated-file-list/:filename/page/:pageIndex", async (req, res) => {
     const { filename, pageIndex } = req.params;
-    const { pageSize } = req.query;
+    const { pageSize, configFile } = req.query;
     const pageIndexNumber = parseInt(pageIndex, 10);
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
     try {
-        const files = await executionService.getListFilesByPage(pageIndexNumber, pageSizeNumber);
+        // Use dynamic paths if configFile is provided, otherwise use defaults
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const files = await executionService.getListFilesByPage(pageIndexNumber, pageSizeNumber, configFilePath);
         res.status(200).json(files);
     }
     catch (error) {
@@ -215,9 +233,11 @@ router.get("/paginated-file-list/:filename/page/:pageIndex", async (req, res) =>
         res.status(500).json({ error: "Internal server error while trying to fetch files." });
     }
 });
-router.get("/get-all-input-file-names", async (_req, res) => {
+router.get("/get-all-input-file-names", async (req, res) => {
+    const { configFile } = req.query;
     try {
-        const files = await executionService.getAllInputNames();
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const files = await executionService.getAllInputNames(configFilePath);
         res.status(200).json(files);
     }
     catch (error) {
@@ -225,12 +245,29 @@ router.get("/get-all-input-file-names", async (_req, res) => {
         res.status(500).json({ error: "Internal server error while trying to fetch all input file names." });
     }
 });
+// New route specifically for config-based file lists
+router.get("/paginated-file-list-by-config/:configFileName/page/:pageIndex", async (req, res) => {
+    const { configFileName, pageIndex } = req.params;
+    const { pageSize } = req.query;
+    const pageIndexNumber = parseInt(pageIndex, 10);
+    const pageSizeNumber = parseInt(pageSize, 10) || 10;
+    const configFilePath = path_1.default.join(uploadsDirDocker, configFileName);
+    try {
+        const files = await executionService.getListFilesByPage(pageIndexNumber, pageSizeNumber, configFilePath);
+        res.status(200).json(files);
+    }
+    catch (error) {
+        console.error(`Error fetching files for config ${configFileName}, page ${pageIndexNumber}:`, error);
+        res.status(500).json({ error: "Internal server error while trying to fetch files." });
+    }
+});
 // TODO: o parâmetro deve ser o nome do arquivo config
 // /get-grouped-class-names/:configFileName
 router.get("/grouped-input-class-names", async (req, res) => {
-    // const { configFileName } = req.params;
+    const { configFile } = req.query;
     try {
-        const classNames = await executionService.allFilenamesByClasses();
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const classNames = await executionService.allFilenamesByClasses(configFilePath);
         res.status(200).json(classNames);
     }
     catch (error) {
@@ -239,14 +276,47 @@ router.get("/grouped-input-class-names", async (req, res) => {
     }
 });
 router.get("/input-file-details-by-name", async (req, res) => {
-    // const { inputFileNames } = req.query;
+    const { configFile } = req.query;
     try {
-        const inputFileDetails = await executionService.inputFileDetailsByName();
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const inputFileDetails = await executionService.inputFileDetailsByName(configFilePath);
         res.status(200).json(inputFileDetails);
     }
     catch (error) {
         console.error("Error fetching input file details:", error);
         res.status(500).json({ error: "Internal server error while trying to fetch input file details." });
+    }
+});
+// New route that uses dynamic paths based on config file
+router.get("/dynamic-paths/:configFileName", async (req, res) => {
+    const { configFileName } = req.params;
+    const configFilePath = path_1.default.join(uploadsDirDocker, configFileName);
+    try {
+        const dynamicPaths = await dynamic_paths_service_1.DynamicPathsService.getPathsForConfig(configFilePath);
+        res.status(200).json({
+            success: true,
+            data: dynamicPaths
+        });
+    }
+    catch (error) {
+        console.error("Error fetching dynamic paths:", error);
+        res.status(500).json({
+            success: false,
+            error: "Internal server error while trying to fetch dynamic paths."
+        });
+    }
+});
+// Updated route that uses dynamic paths for specific config
+router.get("/grouped-input-class-names/:configFileName", async (req, res) => {
+    const { configFileName } = req.params;
+    const configFilePath = path_1.default.join(uploadsDirDocker, configFileName);
+    try {
+        const classNames = await executionService.allFilenamesByClasses(configFilePath);
+        res.status(200).json(classNames);
+    }
+    catch (error) {
+        console.error("Error fetching class names for config:", error);
+        res.status(500).json({ error: "Internal server error while trying to fetch class names." });
     }
 });
 exports.default = router;

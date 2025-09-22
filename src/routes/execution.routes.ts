@@ -351,4 +351,45 @@ router.get("/grouped-input-class-names/:configFileName", async (req: Request, re
   }
 });
 
+// Route to count lines in a file
+router.get("/count-file-lines", async (req: Request, res: Response) => {
+  const { filePath } = req.query;
+  
+  if (!filePath || typeof filePath !== 'string') {
+    res.status(400).json({ error: "filePath query parameter is required" });
+    return;
+  }
+  
+  try {
+    // Check if file exists
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    
+    // Count lines
+    const fileStream = fs.createReadStream(filePath);
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    });
+    
+    let lineCount = 0;
+    for await (const line of rl) {
+      if (line.trim() !== '') {
+        lineCount++;
+      }
+    }
+    
+    res.status(200).json({ 
+      success: true, 
+      lineCount,
+      filePath 
+    });
+  } catch (error) {
+    console.error("Error counting file lines:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Internal server error while counting file lines." 
+    });
+  }
+});
+
 export default router;
