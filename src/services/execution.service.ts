@@ -209,4 +209,21 @@ export class ExecutionService {
 
     return filtered;
   }
+
+  public async getLineNumberByImageName(imageName: string, configFilePath?: string): Promise<{ imageName: string; lineNumber: number }> {
+    const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+    const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
+    
+    await fs.promises.access(datasetListPath, fs.constants.F_OK);
+    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
+    const allFiles = fileContent.split("\n").filter(Boolean);
+
+    for (let i = 0; i < allFiles.length; i++) {
+      if (allFiles[i].trim() === imageName.trim()) {
+        return { imageName, lineNumber: i + 1 };
+      }
+    }
+
+    throw new Error(`Image name ${imageName} not found in file.`);
+  }
 }

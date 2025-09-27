@@ -130,36 +130,16 @@ router.get("/file-input-details-by-line-numbers", async (req: Request, res: Resp
 
 router.get("/teste/get-line-by-image-name/:imageName", async (req: Request, res: Response) => {
   const { imageName } = req.params;
-  const listFilePath = "/app/Datasets/mpeg7/lists_mpeg7.txt";
+  const { configFile } = req.query;
 
   try {
-    await fs.promises.access(listFilePath, fs.constants.F_OK);
-
-    const fileStream = fs.createReadStream(listFilePath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
-
-    let lineNumber = 0;
-    let foundLineNumber: number | null = null;
-
-    for await (const line of rl) {
-      lineNumber++;
-      if (line.trim() === imageName) {
-        foundLineNumber = lineNumber;
-        break;
-      }
-    }
-
-    if (foundLineNumber !== null) {
-      res.status(200).json({ imageName: imageName, lineNumber: foundLineNumber });
-    } else {
-      res.status(404).json({ error: `Image name ${imageName} not found in file.` });
-    }
+    const executionService = new ExecutionService();
+    const configFilePath = configFile ? path.join(uploadsDirDocker, configFile as string) : undefined;
+    const result = await executionService.getLineNumberByImageName(imageName, configFilePath);
+    res.status(200).json(result);
   } catch (error: any) {
-    if (error.code === "ENOENT") {
-      res.status(404).json({ error: "File not found." });
+    if (error.message && error.message.includes("not found")) {
+      res.status(404).json({ error: error.message });
       return;
     }
     console.error(`Error processing request for image name ${imageName}:`, error);
