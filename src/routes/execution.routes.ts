@@ -153,27 +153,26 @@ router.get("/image-file/:imageName", (req: Request, res: Response) => {
   const { configFile } = req.query;
   const configFilePath = configFile ? path.join(uploadsDirDocker, configFile as string) : undefined;
   console.log("Config file path:", configFilePath);
-  
+
   if (!configFilePath) {
     res.status(400).json({ error: "Config file is required for this endpoint" });
     return;
   }
-  
+
   DynamicPathsService.getPathsForConfig(configFilePath)
     .then((dynamicPaths) => {
       const imagePath = path.join(dynamicPaths.datasetImages, imageName);
-      
+
       // Verifica se o arquivo existe
-      return fs.promises.access(imagePath, fs.constants.F_OK)
-        .then(() => {
-          // Envia o arquivo de imagem
-          res.sendFile(imagePath, (err) => {
-            if (err) {
-              console.error(`Error sending image file: ${err}`);
-              res.status(500).json({ error: "Error sending image file" });
-            }
-          });
+      return fs.promises.access(imagePath, fs.constants.F_OK).then(() => {
+        // Envia o arquivo de imagem
+        res.sendFile(imagePath, (err) => {
+          if (err) {
+            console.error(`Error sending image file: ${err}`);
+            res.status(500).json({ error: "Error sending image file" });
+          }
         });
+      });
     })
     .catch((err) => {
       console.error(`File not found: ${err}`);
@@ -229,7 +228,7 @@ router.get("/paginated-file-list/:filename/page/:pageIndex", async (req: Request
 
   try {
     // Use dynamic paths if configFile is provided, otherwise use defaults
-    const configFilePath = configFile ? path.join(uploadsDirDocker, configFile as string) : undefined;
+    const configFilePath = path.join(uploadsDirDocker, configFile as string);
     const files = await executionService.getListFilesByPage(pageIndexNumber, pageSizeNumber, configFilePath);
     res.status(200).json(files);
   } catch (error) {
@@ -240,7 +239,7 @@ router.get("/paginated-file-list/:filename/page/:pageIndex", async (req: Request
 
 router.get("/get-all-input-file-names", async (req: Request, res: Response) => {
   const { configFile } = req.query;
-  
+
   try {
     const configFilePath = configFile ? path.join(uploadsDirDocker, configFile as string) : undefined;
     const files = await executionService.getAllInputNames(configFilePath);
@@ -273,7 +272,7 @@ router.get("/paginated-file-list-by-config/:configFileName/page/:pageIndex", asy
 // /get-grouped-class-names/:configFileName
 router.get("/grouped-input-class-names", async (req: Request, res: Response) => {
   const { configFile } = req.query;
-  
+
   try {
     const configFilePath = configFile ? path.join(uploadsDirDocker, configFile as string) : undefined;
     const classNames = await executionService.allFilenamesByClasses(configFilePath);
@@ -286,7 +285,7 @@ router.get("/grouped-input-class-names", async (req: Request, res: Response) => 
 
 router.get("/input-file-details-by-name", async (req: Request, res: Response) => {
   const { configFile } = req.query;
-  
+
   try {
     const configFilePath = configFile ? path.join(uploadsDirDocker, configFile as string) : undefined;
     const inputFileDetails = await executionService.inputFileDetailsByName(configFilePath);
@@ -301,18 +300,18 @@ router.get("/input-file-details-by-name", async (req: Request, res: Response) =>
 router.get("/dynamic-paths/:configFileName", async (req: Request, res: Response) => {
   const { configFileName } = req.params;
   const configFilePath = path.join(uploadsDirDocker, configFileName);
-  
+
   try {
     const dynamicPaths = await DynamicPathsService.getPathsForConfig(configFilePath);
     res.status(200).json({
       success: true,
-      data: dynamicPaths
+      data: dynamicPaths,
     });
   } catch (error) {
     console.error("Error fetching dynamic paths:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Internal server error while trying to fetch dynamic paths." 
+      error: "Internal server error while trying to fetch dynamic paths.",
     });
   }
 });
@@ -321,7 +320,7 @@ router.get("/dynamic-paths/:configFileName", async (req: Request, res: Response)
 router.get("/grouped-input-class-names/:configFileName", async (req: Request, res: Response) => {
   const { configFileName } = req.params;
   const configFilePath = path.join(uploadsDirDocker, configFileName);
-  
+
   try {
     const classNames = await executionService.allFilenamesByClasses(configFilePath);
     res.status(200).json(classNames);
@@ -331,43 +330,67 @@ router.get("/grouped-input-class-names/:configFileName", async (req: Request, re
   }
 });
 
+// Route to clear cache for a specific config file
+router.post("/clear-cache", async (req: Request, res: Response) => {
+  const { configFileName } = req.body;
+  
+  try {
+    if (configFileName) {
+      const configFilePath = path.join(uploadsDirDocker, configFileName);
+      DynamicPathsService.clearCache(configFilePath);
+      res.status(200).json({ 
+        message: `Cache cleared for config file: ${configFileName}`,
+        configFilePath 
+      });
+    } else {
+      DynamicPathsService.clearCache();
+      res.status(200).json({ 
+        message: "All cache cleared" 
+      });
+    }
+  } catch (error) {
+    console.error("Error clearing cache:", error);
+    res.status(500).json({ error: "Internal server error while clearing cache." });
+  }
+});
+
 // Route to count lines in a file
 router.get("/count-file-lines", async (req: Request, res: Response) => {
   const { filePath } = req.query;
-  
-  if (!filePath || typeof filePath !== 'string') {
+
+  if (!filePath || typeof filePath !== "string") {
     res.status(400).json({ error: "filePath query parameter is required" });
     return;
   }
-  
+
   try {
     // Check if file exists
     await fs.promises.access(filePath, fs.constants.F_OK);
-    
+
     // Count lines
     const fileStream = fs.createReadStream(filePath);
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,
     });
-    
+
     let lineCount = 0;
     for await (const line of rl) {
-      if (line.trim() !== '') {
+      if (line.trim() !== "") {
         lineCount++;
       }
     }
-    
-    res.status(200).json({ 
-      success: true, 
+
+    res.status(200).json({
+      success: true,
       lineCount,
-      filePath 
+      filePath,
     });
   } catch (error) {
     console.error("Error counting file lines:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Internal server error while counting file lines." 
+      error: "Internal server error while counting file lines.",
     });
   }
 });

@@ -118,33 +118,16 @@ router.get("/file-input-details-by-line-numbers", async (req, res) => {
 });
 router.get("/teste/get-line-by-image-name/:imageName", async (req, res) => {
     const { imageName } = req.params;
-    const listFilePath = "/app/Datasets/mpeg7/lists_mpeg7.txt";
+    const { configFile } = req.query;
     try {
-        await fs_1.default.promises.access(listFilePath, fs_1.default.constants.F_OK);
-        const fileStream = fs_1.default.createReadStream(listFilePath);
-        const rl = readline_1.default.createInterface({
-            input: fileStream,
-            crlfDelay: Infinity,
-        });
-        let lineNumber = 0;
-        let foundLineNumber = null;
-        for await (const line of rl) {
-            lineNumber++;
-            if (line.trim() === imageName) {
-                foundLineNumber = lineNumber;
-                break;
-            }
-        }
-        if (foundLineNumber !== null) {
-            res.status(200).json({ imageName: imageName, lineNumber: foundLineNumber });
-        }
-        else {
-            res.status(404).json({ error: `Image name ${imageName} not found in file.` });
-        }
+        const executionService = new execution_service_1.ExecutionService();
+        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const result = await executionService.getLineNumberByImageName(imageName, configFilePath);
+        res.status(200).json(result);
     }
     catch (error) {
-        if (error.code === "ENOENT") {
-            res.status(404).json({ error: "File not found." });
+        if (error.message && error.message.includes("not found")) {
+            res.status(404).json({ error: error.message });
             return;
         }
         console.error(`Error processing request for image name ${imageName}:`, error);
@@ -165,8 +148,7 @@ router.get("/image-file/:imageName", (req, res) => {
         .then((dynamicPaths) => {
         const imagePath = path_1.default.join(dynamicPaths.datasetImages, imageName);
         // Verifica se o arquivo existe
-        return fs_1.default.promises.access(imagePath, fs_1.default.constants.F_OK)
-            .then(() => {
+        return fs_1.default.promises.access(imagePath, fs_1.default.constants.F_OK).then(() => {
             // Envia o arquivo de imagem
             res.sendFile(imagePath, (err) => {
                 if (err) {
@@ -224,7 +206,7 @@ router.get("/paginated-file-list/:filename/page/:pageIndex", async (req, res) =>
     const pageSizeNumber = parseInt(pageSize, 10) || 10;
     try {
         // Use dynamic paths if configFile is provided, otherwise use defaults
-        const configFilePath = configFile ? path_1.default.join(uploadsDirDocker, configFile) : undefined;
+        const configFilePath = path_1.default.join(uploadsDirDocker, configFile);
         const files = await executionService.getListFilesByPage(pageIndexNumber, pageSizeNumber, configFilePath);
         res.status(200).json(files);
     }
@@ -295,14 +277,14 @@ router.get("/dynamic-paths/:configFileName", async (req, res) => {
         const dynamicPaths = await dynamic_paths_service_1.DynamicPathsService.getPathsForConfig(configFilePath);
         res.status(200).json({
             success: true,
-            data: dynamicPaths
+            data: dynamicPaths,
         });
     }
     catch (error) {
         console.error("Error fetching dynamic paths:", error);
         res.status(500).json({
             success: false,
-            error: "Internal server error while trying to fetch dynamic paths."
+            error: "Internal server error while trying to fetch dynamic paths.",
         });
     }
 });
@@ -317,6 +299,66 @@ router.get("/grouped-input-class-names/:configFileName", async (req, res) => {
     catch (error) {
         console.error("Error fetching class names for config:", error);
         res.status(500).json({ error: "Internal server error while trying to fetch class names." });
+    }
+});
+// Route to clear cache for a specific config file
+router.post("/clear-cache", async (req, res) => {
+    const { configFileName } = req.body;
+    try {
+        if (configFileName) {
+            const configFilePath = path_1.default.join(uploadsDirDocker, configFileName);
+            dynamic_paths_service_1.DynamicPathsService.clearCache(configFilePath);
+            res.status(200).json({
+                message: `Cache cleared for config file: ${configFileName}`,
+                configFilePath
+            });
+        }
+        else {
+            dynamic_paths_service_1.DynamicPathsService.clearCache();
+            res.status(200).json({
+                message: "All cache cleared"
+            });
+        }
+    }
+    catch (error) {
+        console.error("Error clearing cache:", error);
+        res.status(500).json({ error: "Internal server error while clearing cache." });
+    }
+});
+// Route to count lines in a file
+router.get("/count-file-lines", async (req, res) => {
+    const { filePath } = req.query;
+    if (!filePath || typeof filePath !== "string") {
+        res.status(400).json({ error: "filePath query parameter is required" });
+        return;
+    }
+    try {
+        // Check if file exists
+        await fs_1.default.promises.access(filePath, fs_1.default.constants.F_OK);
+        // Count lines
+        const fileStream = fs_1.default.createReadStream(filePath);
+        const rl = readline_1.default.createInterface({
+            input: fileStream,
+            crlfDelay: Infinity,
+        });
+        let lineCount = 0;
+        for await (const line of rl) {
+            if (line.trim() !== "") {
+                lineCount++;
+            }
+        }
+        res.status(200).json({
+            success: true,
+            lineCount,
+            filePath,
+        });
+    }
+    catch (error) {
+        console.error("Error counting file lines:", error);
+        res.status(500).json({
+            success: false,
+            error: "Internal server error while counting file lines.",
+        });
     }
 });
 exports.default = router;

@@ -20,9 +20,9 @@ class ExecutionService {
      * Load dynamic paths from config file
      */
     async loadConfigPaths(configFilePath) {
-        if (!this.configPaths) {
-            this.configPaths = await config_parser_1.ConfigParser.getDynamicPaths(configFilePath);
-        }
+        // Always load fresh paths for the specific config file
+        // This ensures we don't use cached paths from previous executions
+        this.configPaths = await config_parser_1.ConfigParser.getDynamicPaths(configFilePath);
         return this.configPaths;
     }
     async execute(configFilePath) {
@@ -31,24 +31,24 @@ class ExecutionService {
         return new Promise((resolve, reject) => {
             const child = (0, child_process_1.spawn)(executablePath, [configFilePath], {
                 cwd: outputDir,
-                stdio: ['pipe', 'pipe', 'pipe']
+                stdio: ["pipe", "pipe", "pipe"],
             });
-            let stdout = '';
-            let stderr = '';
+            let stdout = "";
+            let stderr = "";
             // Captura stdout
-            child.stdout?.on('data', (data) => {
+            child.stdout?.on("data", (data) => {
                 const output = data.toString();
                 stdout += output;
                 console.log(`Command output: ${output}`);
             });
             // Captura stderr
-            child.stderr?.on('data', (data) => {
+            child.stderr?.on("data", (data) => {
                 const error = data.toString();
                 stderr += error;
                 console.error(`Command error output: ${error}`);
             });
             // Evento de finalização
-            child.on('close', (code) => {
+            child.on("close", (code) => {
                 if (code === 0) {
                     resolve({ stdout, stderr });
                 }
@@ -57,25 +57,25 @@ class ExecutionService {
                         error: "Command failed",
                         details: `Process exited with code ${code}`,
                         stdout,
-                        stderr
+                        stderr,
                     });
                 }
             });
             // Evento de erro
-            child.on('error', (error) => {
+            child.on("error", (error) => {
                 console.error(`Error executing command: ${error.message}`);
                 reject({
                     error: "Failed to execute command",
                     details: error.message,
                     stdout,
-                    stderr
+                    stderr,
                 });
             });
         });
     }
     async getFileNameByIndex(index, configFilePath) {
-        const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
-        const datasetListPath = dynamicPaths?.datasetList || paths_1.paths.datasetList;
+        const dynamicPaths = await this.loadConfigPaths(configFilePath);
+        const datasetListPath = dynamicPaths.datasetList;
         await fs_1.default.promises.access(datasetListPath, fs_1.default.constants.F_OK);
         const lineNumberToAccess = index + 1;
         const lineContent = await (0, helpers_1.readSpecificLine)(datasetListPath, lineNumberToAccess);
@@ -85,8 +85,11 @@ class ExecutionService {
         return lineContent;
     }
     async getListFilesByPage(pageIndex, pageSize, configFilePath) {
-        const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
-        const datasetListPath = dynamicPaths?.datasetList || paths_1.paths.datasetList;
+        const dynamicPaths = await this.loadConfigPaths(configFilePath);
+        const datasetListPath = dynamicPaths.datasetList;
+        console.log("dynamicPaths:", dynamicPaths);
+        console.log(`Using dataset list path: ${datasetListPath}`);
+        console.log(`Requested pageIndex: ${pageIndex}, pageSize: ${pageSize}`);
         await fs_1.default.promises.access(datasetListPath, fs_1.default.constants.F_OK);
         const fileContent = await fs_1.default.promises.readFile(datasetListPath, "utf-8");
         const allFiles = fileContent.split("\n").filter(Boolean);
@@ -177,6 +180,19 @@ class ExecutionService {
             }
         }
         return filtered;
+    }
+    async getLineNumberByImageName(imageName, configFilePath) {
+        const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
+        const datasetListPath = dynamicPaths?.datasetList || paths_1.paths.datasetList;
+        await fs_1.default.promises.access(datasetListPath, fs_1.default.constants.F_OK);
+        const fileContent = await fs_1.default.promises.readFile(datasetListPath, "utf-8");
+        const allFiles = fileContent.split("\n").filter(Boolean);
+        for (let i = 0; i < allFiles.length; i++) {
+            if (allFiles[i].trim() === imageName.trim()) {
+                return { imageName, lineNumber: i + 1 };
+            }
+        }
+        throw new Error(`Image name ${imageName} not found in file.`);
     }
 }
 exports.ExecutionService = ExecutionService;
