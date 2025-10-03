@@ -333,19 +333,19 @@ router.get("/grouped-input-class-names/:configFileName", async (req: Request, re
 // Route to clear cache for a specific config file
 router.post("/clear-cache", async (req: Request, res: Response) => {
   const { configFileName } = req.body;
-  
+
   try {
     if (configFileName) {
       const configFilePath = path.join(uploadsDirDocker, configFileName);
       DynamicPathsService.clearCache(configFilePath);
-      res.status(200).json({ 
+      res.status(200).json({
         message: `Cache cleared for config file: ${configFileName}`,
-        configFilePath 
+        configFilePath,
       });
     } else {
       DynamicPathsService.clearCache();
-      res.status(200).json({ 
-        message: "All cache cleared" 
+      res.status(200).json({
+        message: "All cache cleared",
       });
     }
   } catch (error) {
@@ -395,4 +395,47 @@ router.get("/count-file-lines", async (req: Request, res: Response) => {
   }
 });
 
+// Get log file content route
+router.get("/get-log-content/:filename", (req: Request, res: Response) => {
+  const { filename } = req.params;
+
+  // Try multiple possible output directories
+  const outputdirs = [
+    "/Users/italomatos/Documents/IC/udlf-web-front-and-api/udlf-web-api/outputs", // Current project
+    "/Users/italomatos/Documents/IC/udlf-api/outputs", // Legacy path
+    "/app/outputs", // Docker path
+  ];
+
+  const tryReadFile = (dirIndex: number) => {
+    if (dirIndex >= outputdirs.length) {
+      console.error(`Log file not found in any directory: ${filename}`);
+      res.status(404).json({ error: "Log file not found" });
+      return;
+    }
+
+    const outputdir = outputdirs[dirIndex];
+    const filePath = path.join(outputdir, filename);
+
+    fs.access(filePath, fs.constants.F_OK, (err) => {
+      if (err) {
+        console.log(`Log file not found in ${filePath}, trying next directory...`);
+        tryReadFile(dirIndex + 1);
+        return;
+      }
+
+      console.log(`Log file found at: ${filePath}`);
+      fs.readFile(filePath, "utf8", (readErr, data) => {
+        if (readErr) {
+          console.error(`Error reading log file: ${readErr}`);
+          res.status(500).json({ error: "Error reading log file" });
+          return;
+        }
+
+        res.json(data);
+      });
+    });
+  };
+
+  tryReadFile(0);
+});
 export default router;
