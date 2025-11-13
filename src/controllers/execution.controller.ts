@@ -109,13 +109,12 @@ export class ExecutionController {
         }
       }
       
-      // Save modified config in /tmp (Cloud Run has writable /tmp)
-      const executionId = randomBytes(4).toString('hex');
-      const tempConfigPath = `/tmp/config_${executionId}.ini`;
-      fs.writeFileSync(tempConfigPath, modifiedConfig);
-      console.log(`✓ Created normalized config: ${tempConfigPath}`);
+      // IMPORTANT: Overwrite the original file with normalized paths
+      // This ensures that subsequent reads (e.g., for image serving) use correct paths
+      fs.writeFileSync(configFilePath, modifiedConfig);
+      console.log(`✓ Overwrote config with normalized paths: ${configFilePath}`);
       
-      return tempConfigPath;
+      return configFilePath;
     } catch (error) {
       console.error("Error preparing Cloud Run execution:", error);
       throw new Error("Failed to prepare Cloud Run execution environment");
