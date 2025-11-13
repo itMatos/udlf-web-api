@@ -37,6 +37,18 @@ export class FileAccessor {
   }
 
   /**
+   * Convert /app/... paths to /mnt/gcs/app/... for Cloud Run GCSFuse
+   */
+  private static convertToGCSFusePath(filePath: string): string {
+    if (filePath.startsWith('/app/Datasets/')) {
+      return '/mnt/gcs' + filePath;
+    } else if (filePath.startsWith('app/Datasets/')) {
+      return '/mnt/gcs/' + filePath;
+    }
+    return filePath;
+  }
+
+  /**
    * Read file content - works with both local files and GCS
    */
   static async readFile(filePath: string): Promise<string> {
@@ -44,7 +56,8 @@ export class FileAccessor {
 
     // If in Cloud Run, files are mounted via GCSFuse - use direct access
     if (this.isCloudRun()) {
-      return fs.promises.readFile(filePath, 'utf-8');
+      const gcsFusePath = this.convertToGCSFusePath(filePath);
+      return fs.promises.readFile(gcsFusePath, 'utf-8');
     }
 
     // If in demo mode (local), try to get from cache or download from GCS
@@ -85,7 +98,8 @@ export class FileAccessor {
     // If in Cloud Run, files are mounted via GCSFuse
     if (this.isCloudRun()) {
       try {
-        await fs.promises.access(filePath, fs.constants.F_OK);
+        const gcsFusePath = this.convertToGCSFusePath(filePath);
+        await fs.promises.access(gcsFusePath, fs.constants.F_OK);
         return true;
       } catch {
         return false;

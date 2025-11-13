@@ -76,7 +76,7 @@ export class ExecutionController {
   }
 
   /**
-   * Normalize paths in config for Cloud Run (GCSFuse mounted at /app/Datasets)
+   * Normalize paths in config for Cloud Run (GCSFuse mounted at /mnt/gcs)
    */
   private prepareCloudRunExecution(configFilePath: string): string {
     try {
@@ -89,11 +89,20 @@ export class ExecutionController {
       
       let modifiedConfig = configContent;
       
-      // Fix paths: ensure they start with / for absolute paths
+      // Fix paths: convert to GCSFuse mount point
       for (const filePath of filePaths) {
-        // If path starts with 'app/' or 'Datasets/', add leading slash
-        if (filePath.startsWith('app/') || filePath.startsWith('Datasets/')) {
-          const absolutePath = '/' + filePath;
+        let absolutePath = filePath;
+        
+        // Convert relative paths to /mnt/gcs absolute paths
+        if (filePath.startsWith('app/')) {
+          absolutePath = '/mnt/gcs/' + filePath;
+        } else if (filePath.startsWith('Datasets/')) {
+          absolutePath = '/mnt/gcs/app/' + filePath;
+        } else if (filePath.startsWith('/app/')) {
+          absolutePath = '/mnt/gcs' + filePath;
+        }
+        
+        if (absolutePath !== filePath) {
           console.log(`Normalizing: ${filePath} -> ${absolutePath}`);
           // Replace ALL occurrences
           modifiedConfig = modifiedConfig.split(filePath).join(absolutePath);
