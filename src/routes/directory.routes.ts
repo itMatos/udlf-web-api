@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { DirectoryService } from "../services/directory.service";
 import { DirectoryController } from "../controllers/directory.controller";
+import { DemoDirectoryService } from "../services/demo-directory.service";
 
 const router = Router();
 const directoryService = new DirectoryService();
-const directoryController = new DirectoryController(directoryService);
+const demoDirectoryService = new DemoDirectoryService();
+const directoryController = new DirectoryController(directoryService, demoDirectoryService);
 
 /**
  * @route GET /api/directory/list

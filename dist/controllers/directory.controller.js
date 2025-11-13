@@ -6,8 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DirectoryController = void 0;
 const fs_1 = __importDefault(require("fs"));
 class DirectoryController {
-    constructor(directoryService) {
+    constructor(directoryService, demoDirectoryService) {
         this.directoryService = directoryService;
+        this.demoDirectoryService = demoDirectoryService;
     }
     /**
      * Lista o conteúdo de um diretório
@@ -15,12 +16,24 @@ class DirectoryController {
     async listDirectory(req, res) {
         try {
             const { path: directoryPath } = req.query;
+            const apiMode = process.env.API_MODE?.toLowerCase();
             const pathParam = typeof directoryPath === 'string' ? directoryPath : undefined;
-            const result = await this.directoryService.listDirectory(pathParam);
-            res.status(200).json({
-                success: true,
-                data: result
-            });
+            if (apiMode === 'demo') {
+                const result = await this.demoDirectoryService.listDemoDirectory(pathParam);
+                res.status(200).json({
+                    success: true,
+                    data: result
+                });
+                return;
+            }
+            else {
+                const result = await this.directoryService.listDirectory(pathParam);
+                res.status(200).json({
+                    success: true,
+                    data: result
+                });
+                return;
+            }
         }
         catch (error) {
             console.error('Error listing directory:', error);

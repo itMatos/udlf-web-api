@@ -1,12 +1,15 @@
 import { Request, Response } from "express";
 import fs from "fs";
 import { DirectoryService } from "../services/directory.service";
+import { DemoDirectoryService } from "../services/demo-directory.service";
 
 export class DirectoryController {
   private directoryService: DirectoryService;
-
-  constructor(directoryService: DirectoryService) {
+  private demoDirectoryService: DemoDirectoryService;
+  
+  constructor(directoryService: DirectoryService, demoDirectoryService: DemoDirectoryService) {
     this.directoryService = directoryService;
+    this.demoDirectoryService = demoDirectoryService;
   }
 
   /**
@@ -15,14 +18,25 @@ export class DirectoryController {
   public async listDirectory(req: Request, res: Response): Promise<void> {
     try {
       const { path: directoryPath } = req.query;
-      
+      const apiMode = process.env.API_MODE?.toLowerCase();
       const pathParam = typeof directoryPath === 'string' ? directoryPath : undefined;
-      const result = await this.directoryService.listDirectory(pathParam);
       
-      res.status(200).json({
-        success: true,
-        data: result
-      });
+      if (apiMode === 'demo') {
+        const result = await this.demoDirectoryService.listDemoDirectory(pathParam);
+        res.status(200).json({
+          success: true,
+          data: result
+        });
+        return;
+      }
+      else {
+        const result = await this.directoryService.listDirectory(pathParam);
+        res.status(200).json({
+          success: true,
+          data: result
+          });
+        return;
+      }
     } catch (error) {
       console.error('Error listing directory:', error);
       res.status(500).json({

@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const directory_service_1 = require("../services/directory.service");
 const directory_controller_1 = require("../controllers/directory.controller");
+const demo_directory_service_1 = require("../services/demo-directory.service");
 const router = (0, express_1.Router)();
 const directoryService = new directory_service_1.DirectoryService();
-const directoryController = new directory_controller_1.DirectoryController(directoryService);
+const demoDirectoryService = new demo_directory_service_1.DemoDirectoryService();
+const directoryController = new directory_controller_1.DirectoryController(directoryService, demoDirectoryService);
 /**
  * @route GET /api/directory/list
  * @description Lista o conteúdo de um diretório

@@ -310,13 +310,13 @@ router.post("/clear-cache", async (req, res) => {
             dynamic_paths_service_1.DynamicPathsService.clearCache(configFilePath);
             res.status(200).json({
                 message: `Cache cleared for config file: ${configFileName}`,
-                configFilePath
+                configFilePath,
             });
         }
         else {
             dynamic_paths_service_1.DynamicPathsService.clearCache();
             res.status(200).json({
-                message: "All cache cleared"
+                message: "All cache cleared",
             });
         }
     }
@@ -360,5 +360,41 @@ router.get("/count-file-lines", async (req, res) => {
             error: "Internal server error while counting file lines.",
         });
     }
+});
+// Get log file content route
+router.get("/get-log-content/:filename", (req, res) => {
+    const { filename } = req.params;
+    // Try multiple possible output directories
+    const outputdirs = [
+        "/Users/italomatos/Documents/IC/udlf-web-front-and-api/udlf-web-api/outputs", // Current project
+        "/Users/italomatos/Documents/IC/udlf-api/outputs", // Legacy path
+        "/app/outputs", // Docker path
+    ];
+    const tryReadFile = (dirIndex) => {
+        if (dirIndex >= outputdirs.length) {
+            console.error(`Log file not found in any directory: ${filename}`);
+            res.status(404).json({ error: "Log file not found" });
+            return;
+        }
+        const outputdir = outputdirs[dirIndex];
+        const filePath = path_1.default.join(outputdir, filename);
+        fs_1.default.access(filePath, fs_1.default.constants.F_OK, (err) => {
+            if (err) {
+                console.log(`Log file not found in ${filePath}, trying next directory...`);
+                tryReadFile(dirIndex + 1);
+                return;
+            }
+            console.log(`Log file found at: ${filePath}`);
+            fs_1.default.readFile(filePath, "utf8", (readErr, data) => {
+                if (readErr) {
+                    console.error(`Error reading log file: ${readErr}`);
+                    res.status(500).json({ error: "Error reading log file" });
+                    return;
+                }
+                res.json(data);
+            });
+        });
+    };
+    tryReadFile(0);
 });
 exports.default = router;
