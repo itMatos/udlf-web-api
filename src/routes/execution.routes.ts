@@ -570,8 +570,11 @@ router.get("/debug/filesystem", async (req: Request, res: Response) => {
       paths: {
         '/app/uploads': checkPath('/app/uploads'),
         '/app/Datasets': checkPath('/app/Datasets'),
-        '/app/Datasets/oxford17flowers': checkPath('/app/Datasets/oxford17flowers'),
-        '/app/Datasets/oxford17flowers/flowers_lists.txt': checkPath('/app/Datasets/oxford17flowers/flowers_lists.txt'),
+        '/mnt/gcs': checkPath('/mnt/gcs'),
+        '/mnt/gcs/app': checkPath('/mnt/gcs/app'),
+        '/mnt/gcs/app/Datasets': checkPath('/mnt/gcs/app/Datasets'),
+        '/mnt/gcs/app/Datasets/oxford17flowers': checkPath('/mnt/gcs/app/Datasets/oxford17flowers'),
+        '/mnt/gcs/app/Datasets/oxford17flowers/flowers_lists.txt': checkPath('/mnt/gcs/app/Datasets/oxford17flowers/flowers_lists.txt'),
         '/tmp': checkPath('/tmp'),
       }
     };
