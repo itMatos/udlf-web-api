@@ -76,6 +76,44 @@ export class ExecutionController {
   }
 
   /**
+   * Normalize paths in config for Cloud Run (GCSFuse mounted at /app/Datasets)
+   */
+  private prepareCloudRunExecution(configFilePath: string): string {
+    try {
+      console.log("Cloud Run mode: Normalizing paths for GCSFuse...");
+      
+      const configContent = fs.readFileSync(configFilePath, 'utf-8');
+      const filePaths = this.extractFilePaths(configContent);
+      
+      console.log(`Found ${filePaths.length} file paths in config`);
+      
+      let modifiedConfig = configContent;
+      
+      // Fix paths: ensure they start with / for absolute paths
+      for (const filePath of filePaths) {
+        // If path starts with 'app/' or 'Datasets/', add leading slash
+        if (filePath.startsWith('app/') || filePath.startsWith('Datasets/')) {
+          const absolutePath = '/' + filePath;
+          console.log(`Normalizing: ${filePath} -> ${absolutePath}`);
+          // Replace ALL occurrences
+          modifiedConfig = modifiedConfig.split(filePath).join(absolutePath);
+        }
+      }
+      
+      // Save modified config in /tmp (Cloud Run has writable /tmp)
+      const executionId = randomBytes(4).toString('hex');
+      const tempConfigPath = `/tmp/config_${executionId}.ini`;
+      fs.writeFileSync(tempConfigPath, modifiedConfig);
+      console.log(`✓ Created normalized config: ${tempConfigPath}`);
+      
+      return tempConfigPath;
+    } catch (error) {
+      console.error("Error preparing Cloud Run execution:", error);
+      throw new Error("Failed to prepare Cloud Run execution environment");
+    }
+  }
+
+  /**
    * Download files from GCS for local testing (when GCSFuse is not available)
    */
   private async prepareLocalExecution(configFilePath: string): Promise<string> {
@@ -151,12 +189,13 @@ export class ExecutionController {
     let executionConfigPath = configFilePath;
 
     try {
-      // If in demo mode AND not in Cloud Run, download files from GCS
-      if (this.gcsService && !this.isCloudRun()) {
+      // Choose execution strategy based on environment
+      if (this.isCloudRun()) {
+        console.log("Cloud Run detected - normalizing paths for GCSFuse...");
+        executionConfigPath = this.prepareCloudRunExecution(configFilePath);
+      } else if (this.gcsService) {
         console.log("Demo mode (local) detected - downloading files from GCS...");
         executionConfigPath = await this.prepareLocalExecution(configFilePath);
-      } else if (this.isCloudRun()) {
-        console.log("Cloud Run detected - using GCSFuse mounted files");
       }
 
       console.log("Executing command with config:", executionConfigPath);
