@@ -537,4 +537,49 @@ router.get("/get-log-content/:filename", (req: Request, res: Response) => {
 
   tryReadFile(0);
 });
+
+// DEBUG endpoint - remove after testing
+router.get("/debug/filesystem", async (req: Request, res: Response) => {
+  try {
+    const checkPath = (p: string) => {
+      try {
+        if (fs.existsSync(p)) {
+          const stats = fs.statSync(p);
+          if (stats.isDirectory()) {
+            return {
+              exists: true,
+              type: 'directory',
+              contents: fs.readdirSync(p).slice(0, 10) // first 10 items
+            };
+          }
+          return { exists: true, type: 'file', size: stats.size };
+        }
+        return { exists: false };
+      } catch (error: any) {
+        return { exists: false, error: error.message };
+      }
+    };
+
+    const info = {
+      environment: {
+        K_SERVICE: process.env.K_SERVICE,
+        API_MODE: process.env.API_MODE,
+        GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,
+        NODE_ENV: process.env.NODE_ENV,
+      },
+      paths: {
+        '/app/uploads': checkPath('/app/uploads'),
+        '/app/Datasets': checkPath('/app/Datasets'),
+        '/app/Datasets/oxford17flowers': checkPath('/app/Datasets/oxford17flowers'),
+        '/app/Datasets/oxford17flowers/flowers_lists.txt': checkPath('/app/Datasets/oxford17flowers/flowers_lists.txt'),
+        '/tmp': checkPath('/tmp'),
+      }
+    };
+    
+    res.json(info);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
