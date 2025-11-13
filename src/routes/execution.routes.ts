@@ -2,19 +2,35 @@ import { Router, Request, Response } from "express";
 import { ExecutionService } from "../services/execution.service";
 import { ExecutionController } from "../controllers/execution.controller";
 import { DynamicPathsService } from "../services/dynamic-paths.service";
+import { GCSService } from "../services/gcs.service";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import readline from "readline";
 import { readSpecificLine } from "../utils/helpers";
+import { Readable } from "stream";
 
 const router = Router();
 const executionService = new ExecutionService();
 const executionController = new ExecutionController(executionService);
 
+// Initialize GCS service for demo mode
+let gcsService: GCSService | null = null;
+if (process.env.API_MODE?.toLowerCase() === 'demo') {
+  gcsService = new GCSService();
+}
+
+const uploadsDirDocker = "/app/uploads" as const;
+
+// Ensure uploads directory exists
+if (!fs.existsSync(uploadsDirDocker)) {
+  fs.mkdirSync(uploadsDirDocker, { recursive: true });
+  console.log(`Created uploads directory: ${uploadsDirDocker}`);
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, "uploads/");
+    cb(null, uploadsDirDocker);
   },
   filename: (_req, file, cb) => {
     cb(null, file.originalname);
@@ -22,7 +38,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-const uploadsDirDocker = "/app/uploads" as const;
 
 router.get("/", (_req, res) => {
   res.json({
@@ -147,7 +162,7 @@ router.get("/teste/get-line-by-image-name/:imageName", async (req: Request, res:
   }
 });
 
-router.get("/image-file/:imageName", (req: Request, res: Response) => {
+router.get("/image-file/:imageName", async (req: Request, res: Response) => {
   const { imageName } = req.params;
   console.log("Requested image:", imageName);
   const { configFile } = req.query;
@@ -159,25 +174,84 @@ router.get("/image-file/:imageName", (req: Request, res: Response) => {
     return;
   }
 
-  DynamicPathsService.getPathsForConfig(configFilePath)
-    .then((dynamicPaths) => {
-      const imagePath = path.join(dynamicPaths.datasetImages, imageName);
+  try {
+    const dynamicPaths = await DynamicPathsService.getPathsForConfig(configFilePath);
+    const imagePath = path.join(dynamicPaths.datasetImages, imageName);
+    
+    const apiMode = process.env.API_MODE?.toLowerCase();
+    const isCloudRun = !!process.env.K_SERVICE;
 
-      // Verifica se o arquivo existe
-      return fs.promises.access(imagePath, fs.constants.F_OK).then(() => {
-        // Envia o arquivo de imagem
-        res.sendFile(imagePath, (err) => {
-          if (err) {
-            console.error(`Error sending image file: ${err}`);
-            res.status(500).json({ error: "Error sending image file" });
-          }
-        });
+    // If in Cloud Run with GCSFuse, files are mounted locally
+    if (isCloudRun) {
+      res.sendFile(imagePath, (err) => {
+        if (err) {
+          console.error(`Error sending image file: ${err}`);
+          res.status(404).json({ error: "Image file not found" });
+        }
       });
-    })
-    .catch((err) => {
-      console.error(`File not found: ${err}`);
-      res.status(404).json({ error: "Image file not found" });
+      return;
+    }
+
+    // If in demo mode (local), download from GCS and stream to client
+    if (apiMode === 'demo' && gcsService) {
+      // Normalize path for GCS
+      let gcsPath = imagePath.replace(/^\/+/, '');
+      if (!gcsPath.startsWith('app/')) {
+        gcsPath = 'app/' + gcsPath;
+      }
+
+      console.log(`Fetching image from GCS: ${gcsPath}`);
+
+      // Check if file exists
+      const exists = await gcsService.fileExists(gcsPath);
+      if (!exists) {
+        console.error(`Image not found in GCS: ${gcsPath}`);
+        res.status(404).json({ error: "Image file not found" });
+        return;
+      }
+
+      // Stream image from GCS to client
+      const readStream = gcsService.createReadStream(gcsPath);
+      
+      // Set appropriate content type based on file extension
+      const ext = path.extname(imageName).toLowerCase();
+      const contentTypes: Record<string, string> = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+      };
+      const contentType = contentTypes[ext] || 'image/jpeg';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      
+      readStream.pipe(res);
+      
+      readStream.on('error', (err) => {
+        console.error(`Error streaming image from GCS: ${err}`);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Error streaming image" });
+        }
+      });
+
+      return;
+    }
+
+    // Default: local filesystem
+    await fs.promises.access(imagePath, fs.constants.F_OK);
+    res.sendFile(imagePath, (err) => {
+      if (err) {
+        console.error(`Error sending image file: ${err}`);
+        res.status(500).json({ error: "Error sending image file" });
+      }
     });
+  } catch (err) {
+    console.error(`Error processing image request: ${err}`);
+    res.status(404).json({ error: "Image file not found" });
+  }
 });
 
 router.get("/outputs/:filename/line/:line", async (req: Request, res: Response) => {
@@ -364,11 +438,36 @@ router.get("/count-file-lines", async (req: Request, res: Response) => {
   }
 
   try {
-    // Check if file exists
-    await fs.promises.access(filePath, fs.constants.F_OK);
+    const apiMode = process.env.API_MODE?.toLowerCase();
+    let fileStream: NodeJS.ReadableStream;
+
+    if (apiMode === 'demo' && gcsService) {
+      // Normalize path for GCS
+      // Remove leading slash, then ensure it starts with 'app/'
+      let gcsPath = filePath.replace(/^\/+/, '');
+      if (!gcsPath.startsWith('app/')) {
+        gcsPath = 'app/' + gcsPath;
+      }
+      
+      // Check if file exists in GCS
+      const exists = await gcsService.fileExists(gcsPath);
+      if (!exists) {
+        res.status(404).json({ 
+          success: false,
+          error: `File not found in GCS: ${gcsPath}` 
+        });
+        return;
+      }
+
+      // Create read stream from GCS
+      fileStream = gcsService.createReadStream(gcsPath);
+    } else {
+      // Local file system mode
+      await fs.promises.access(filePath, fs.constants.F_OK);
+      fileStream = fs.createReadStream(filePath);
+    }
 
     // Count lines
-    const fileStream = fs.createReadStream(filePath);
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,

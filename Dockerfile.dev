@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Copy package files and install dependencies first (for better caching)
 COPY package*.json ./
-RUN npm ci && npm cache clean --force
+RUN npm install
 
 # Copy UDLF binary
 COPY ./udlf /app/udlf
@@ -15,24 +15,23 @@ COPY ./udlf /app/udlf
 # Make UDLF executable
 RUN chmod +x /app/udlf/bin/udlf
 
-# Copy TypeScript configuration and source code
+# Create necessary directories
+RUN mkdir -p /app/outputs /app/uploads
+
+# Copy TypeScript configuration
 COPY tsconfig.json ./
+
+# Copy source code
 COPY src ./src
 
-# Build TypeScript
-RUN npm run build
-
-# Create necessary directories
-RUN mkdir -p /app/outputs /app/uploads /app/Datasets
-
 # Set environment variables
-ENV NODE_ENV=production
+ENV NODE_ENV=development
 ENV API_MODE=demo
 ENV GCS_BUCKET_NAME=udlf_web_datasets
 ENV GCS_PROJECT_ID=udlf-api-project-1759206589
 
-# Cloud Run uses PORT environment variable
 EXPOSE 8080
 
-# Start the application
-CMD ["npm", "start"]
+# Use nodemon for hot-reload in development
+CMD ["npm", "run", "dev"]
+

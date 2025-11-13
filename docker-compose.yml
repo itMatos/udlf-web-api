@@ -2,13 +2,20 @@ services:
   backend:
     build:
       context: ./
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: udlf_web_api
     ports:
       - "8080:8080"
-
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+      - API_MODE=demo
+      - EXECUTABLE_PATH=/app/udlf/bin/udlf
+      - GCS_BUCKET_NAME=udlf_web_datasets
+      - GCS_PROJECT_ID=udlf-api-project-1759206589
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcs-key.json
     volumes:
-      - .:/app
+      - ./src:/app/src
       - /app/node_modules
-      - ${HOST_UDLF_PATH}:/app/Datasets
+      - ./udlf-api-project-1759206589-c33dd21ada4f.json:/app/credentials/gcs-key.json:ro
     restart: on-failure

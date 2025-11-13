@@ -6,6 +6,7 @@ import { lineContent, PaginatedResponse } from "../types/interfaces";
 import { FileUtils } from "../utils/file.utils";
 import { FilenamesByClass, InputFileDetail } from "../types/file";
 import { ConfigParser, ConfigPaths } from "../utils/config-parser";
+import { FileAccessor } from "../utils/file-accessor";
 
 const executablePathDocker = "/app/udlf/bin/udlf" as const;
 const outputDirDocker = "/app/outputs" as const;
@@ -81,13 +82,15 @@ export class ExecutionService {
     const dynamicPaths = await this.loadConfigPaths(configFilePath);
     const datasetListPath = dynamicPaths.datasetList;
 
-    await fs.promises.access(datasetListPath, fs.constants.F_OK);
+    const fileContent = await FileAccessor.readFile(datasetListPath);
+    const allFiles = fileContent.split("\n").filter(Boolean);
     const lineNumberToAccess = index + 1;
-    const lineContent = await readSpecificLine(datasetListPath, lineNumberToAccess);
-    if (lineContent === null) {
+    
+    if (lineNumberToAccess < 1 || lineNumberToAccess > allFiles.length) {
       throw new Error(`Index ${index} not found in the list file.`);
     }
-    return lineContent;
+    
+    return allFiles[lineNumberToAccess - 1];
   }
 
   public async getListFilesByPage(pageIndex: number, pageSize: number, configFilePath: string): Promise<PaginatedResponse> {
@@ -97,8 +100,7 @@ export class ExecutionService {
     console.log(`Using dataset list path: ${datasetListPath}`);
     console.log(`Requested pageIndex: ${pageIndex}, pageSize: ${pageSize}`);
 
-    await fs.promises.access(datasetListPath, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
+    const fileContent = await FileAccessor.readFile(datasetListPath);
     const allFiles = fileContent.split("\n").filter(Boolean);
     const start = (pageIndex - 1) * pageSize;
     const end = start + pageSize;
@@ -121,8 +123,7 @@ export class ExecutionService {
     const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
     const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
 
-    await fs.promises.access(datasetListPath, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
+    const fileContent = await FileAccessor.readFile(datasetListPath);
     return fileContent.split("\n").filter(Boolean);
   }
 
@@ -130,8 +131,7 @@ export class ExecutionService {
     const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
     const classListPath = dynamicPaths?.classList || paths.classList;
 
-    await fs.promises.access(classListPath, fs.constants.F_OK);
-    const contentClassList = await fs.promises.readFile(classListPath, "utf-8");
+    const contentClassList = await FileAccessor.readFile(classListPath);
     const allNames = contentClassList.split("\n").filter(Boolean);
 
     const groupedByClasses = FileUtils.groupInputFilenamesByClass(allNames);
@@ -143,9 +143,8 @@ export class ExecutionService {
     const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
     const classListPath = dynamicPaths?.classList || paths.classList;
 
-    await fs.promises.access(classListPath, fs.constants.F_OK);
-    const contentListFile = await fs.promises.readFile(datasetListPath, "utf-8");
-    const contentClassList = await fs.promises.readFile(classListPath, "utf-8");
+    const contentListFile = await FileAccessor.readFile(datasetListPath);
+    const contentClassList = await FileAccessor.readFile(classListPath);
     const allInputNames = contentListFile.split("\n").filter(Boolean);
     const allNames = contentClassList.split("\n").filter(Boolean);
 
@@ -161,8 +160,7 @@ export class ExecutionService {
     const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
     const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
 
-    await fs.promises.access(datasetListPath, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
+    const fileContent = await FileAccessor.readFile(datasetListPath);
     const allFiles = fileContent.split("\n").filter(Boolean);
 
     const result: lineContent[] = [];
@@ -184,10 +182,8 @@ export class ExecutionService {
     const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
     const classListPath = dynamicPaths?.classList || paths.classList;
 
-    await fs.promises.access(classListPath, fs.constants.F_OK);
-    await fs.promises.access(datasetListPath, fs.constants.F_OK);
-    const contentListFile = await fs.promises.readFile(datasetListPath, "utf-8");
-    const contentClassList = await fs.promises.readFile(classListPath, "utf-8");
+    const contentListFile = await FileAccessor.readFile(datasetListPath);
+    const contentClassList = await FileAccessor.readFile(classListPath);
 
     // [apple-1.gif, apple-2.gif, ...]
     const allInputNames = contentListFile.split("\n").filter(Boolean);
@@ -217,8 +213,7 @@ export class ExecutionService {
     const dynamicPaths = configFilePath ? await this.loadConfigPaths(configFilePath) : null;
     const datasetListPath = dynamicPaths?.datasetList || paths.datasetList;
 
-    await fs.promises.access(datasetListPath, fs.constants.F_OK);
-    const fileContent = await fs.promises.readFile(datasetListPath, "utf-8");
+    const fileContent = await FileAccessor.readFile(datasetListPath);
     const allFiles = fileContent.split("\n").filter(Boolean);
 
     for (let i = 0; i < allFiles.length; i++) {
