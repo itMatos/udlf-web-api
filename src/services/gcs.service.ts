@@ -1,4 +1,4 @@
-import { Storage, Bucket, File } from "@google-cloud/storage";
+import { Storage, Bucket, File, StorageOptions } from "@google-cloud/storage";
 import { Config } from "../config/config";
 
 /**
@@ -12,25 +12,33 @@ export class GCSService {
     // Check if running in Cloud Run (uses service account automatically)
     const isCloudRun = !!process.env.K_SERVICE;
     
+    console.log(`Initializing GCSService - Cloud Run: ${isCloudRun}, Bucket: ${Config.gcs.bucketName}`);
+    
     // Inicializa o cliente do Google Cloud Storage
     if (isCloudRun) {
       // Cloud Run: use automatic service account authentication
       this.storage = new Storage({
         projectId: Config.gcs.projectId,
       });
-      console.log('GCSService initialized with Cloud Run service account');
+      console.log('✓ GCSService initialized with Cloud Run service account');
     } else {
       // Local/Docker: use key file
-      this.storage = new Storage({
+      const storageOptions: StorageOptions = {
         projectId: Config.gcs.projectId,
-        keyFilename: Config.gcs.keyFilename,
-      });
-      console.log(`GCSService initialized with key file: ${Config.gcs.keyFilename}`);
+      };
+      
+      // Only add keyFilename if it's defined
+      if (Config.gcs.keyFilename) {
+        storageOptions.keyFilename = Config.gcs.keyFilename;
+      }
+      
+      this.storage = new Storage(storageOptions);
+      console.log(`✓ GCSService initialized with key file: ${Config.gcs.keyFilename || 'default credentials'}`);
     }
 
     // Define o bucket padrão
     this.bucket = this.storage.bucket(Config.gcs.bucketName);
-    console.log(`GCSService connected to bucket: ${Config.gcs.bucketName}`);
+    console.log(`✓ GCSService connected to bucket: ${Config.gcs.bucketName}`);
   }
 
   /**
